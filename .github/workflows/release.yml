@@ -1,0 +1,52 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - { os: macos-14,         target: aarch64-apple-darwin,       asset: erpai-darwin-arm64 }
+          - { os: macos-13,         target: x86_64-apple-darwin,        asset: erpai-darwin-x64 }
+          - { os: ubuntu-22.04,     target: x86_64-unknown-linux-gnu,   asset: erpai-linux-x64 }
+          - { os: ubuntu-22.04-arm, target: aarch64-unknown-linux-gnu,  asset: erpai-linux-arm64 }
+          - { os: windows-2022,     target: x86_64-pc-windows-msvc,     asset: erpai-windows-x64.exe }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: "${{ matrix.target }}" }
+      - run: cargo build --release --target ${{ matrix.target }}
+      - name: Stage asset
+        shell: bash
+        run: |
+          mkdir -p dist
+          if [[ "${{ matrix.asset }}" == *.exe ]]; then
+            cp "target/${{ matrix.target }}/release/erpai.exe" "dist/${{ matrix.asset }}"
+          else
+            cp "target/${{ matrix.target }}/release/erpai" "dist/${{ matrix.asset }}"
+          fi
+      - uses: actions/upload-artifact@v4
+        with: { name: "${{ matrix.asset }}", path: "dist/${{ matrix.asset }}" }
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: dist, merge-multiple: true }
+      - name: Tag must match the built version
+        run: |
+          ver="${GITHUB_REF_NAME#v}"; chmod +x dist/erpai-linux-x64
+          [ "$(dist/erpai-linux-x64 --version)" = "erpai $ver" ] || { echo "binary version != tag"; exit 1; }
+      - name: Checksums
+        run: cd dist && sha256sum erpai-* > sha256.txt && cat sha256.txt
+      - name: Publish to erpai-cli-releases
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          [ -n "$GH_TOKEN" ] || { echo "RELEASES_TOKEN secret is not set — refusing to publish"; exit 1; }
+          printf '## What'"'"'s new\n\nSee the erpai-cli changelog for %s.\n' "${GITHUB_REF_NAME}" > notes.md
+          gh release create "${GITHUB_REF_NAME}" dist/* --repo erphq/erpai-cli-releases --title "erpai ${GITHUB_REF_NAME}" --notes-file notes.md
