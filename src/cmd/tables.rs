@@ -104,7 +104,9 @@ pub async fn run(g: &Global, c: TablesCmd) -> Result<Rendered> {
             description,
             object_type,
         } => {
-            let mut body = serde_json::json!({ "name": name, "objectType": object_type });
+            // the create endpoint expects appId in the body as well as the query string
+            let mut body =
+                serde_json::json!({ "name": name, "objectType": object_type, "appId": app });
             if let Some(c) = category {
                 body["category"] = c.into();
             }
