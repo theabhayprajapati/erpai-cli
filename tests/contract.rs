@@ -58,3 +58,41 @@ fn settings_works_without_a_profile() {
     assert_eq!(v["data"]["activeProfile"], "default");
     assert!(v["data"]["active"].is_null());
 }
+
+#[test]
+fn every_leaf_command_documents_output_shape() {
+    let groups: &[(&str, &[&str])] = &[
+        ("apps", &["list", "get"]),
+        ("tables", &["list", "get", "create", "update", "delete"]),
+        ("columns", &["list", "add", "update", "delete"]),
+        (
+            "records",
+            &[
+                "query",
+                "count",
+                "aggregate",
+                "get",
+                "get-many",
+                "create",
+                "bulk-create",
+                "update",
+                "bulk-update",
+                "delete",
+                "bulk-delete",
+                "update-by-filter",
+                "delete-by-filter",
+            ],
+        ),
+        ("sql", &["schema", "run", "generate"]),
+    ];
+    for (g, cmds) in groups {
+        for c in *cmds {
+            let out = erpai().args([g, c, "--help"]).assert().success();
+            let text = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+            assert!(
+                text.contains("Output:"),
+                "{g} {c} --help lacks an Output: line"
+            );
+        }
+    }
+}

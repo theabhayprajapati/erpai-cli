@@ -16,3 +16,7 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
+      - name: Public-contract boundary lint
+        run: |
+          sudo apt-get update && sudo apt-get install --yes ripgrep
+          scripts/check-public-boundary.sh --strict src tests README.md
