@@ -46,6 +46,48 @@ impl ApiClient {
         self.send(Method::DELETE, path, query, body).await
     }
 
+    /// Multipart upload (the one non-JSON request shape). Same auth, error mapping and public-path rule.
+    pub async fn post_multipart(
+        &self,
+        path: &str,
+        query: &[(&str, &str)],
+        form: reqwest::multipart::Form,
+    ) -> Result<Value> {
+        if !(path.starts_with("/v1/") || path.starts_with("/open/v1/")) {
+            return Err(CliError::internal(format!(
+                "refusing non-public path {path}"
+            )));
+        }
+        let url = format!("{}{}", self.base, path);
+        let resp = self
+            .http
+            .post(&url)
+            .query(query)
+            .header("authorization", format!("Bearer {}", self.key))
+            .header("accept", "application/json")
+            .multipart(form)
+            .send()
+            .await
+            .map_err(|e| CliError::network(format!("POST {url}: {e}")))?;
+        let status = resp.status();
+        let request_id = resp
+            .headers()
+            .get("x-request-id")
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string);
+        let text = resp.text().await.unwrap_or_default();
+        let json: Value = if text.trim().is_empty() {
+            Value::Null
+        } else {
+            serde_json::from_str(&text).unwrap_or(Value::String(text.clone()))
+        };
+        if status.is_success() {
+            Ok(json)
+        } else {
+            Err(map_error(status, &json).with_request_id(request_id))
+        }
+    }
+
     async fn send(
         &self,
         method: Method,
