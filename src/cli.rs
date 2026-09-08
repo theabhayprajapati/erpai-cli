@@ -48,6 +48,12 @@ pub enum Command {
     Sql(crate::cmd::sql::SqlCmd),
     /// Workflows (automations) of an app (--app)
     Workflows(crate::cmd::workflows::WorkflowsCmd),
+    /// Saved views of a table (--app, --table)
+    Layouts(crate::cmd::layouts::LayoutsCmd),
+    /// Entry forms of tables (--app, --table)
+    Forms(crate::cmd::forms::FormsCmd),
+    /// Rich-text documents and folders (--app)
+    Documents(crate::cmd::documents::DocumentsCmd),
     /// Sign in (browser) or store an API key
     Login(crate::auth::LoginArgs),
     /// Revoke the stored key and forget the profile

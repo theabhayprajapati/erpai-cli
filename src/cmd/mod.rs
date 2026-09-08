@@ -1,5 +1,8 @@
 pub mod apps;
 pub mod columns;
+pub mod documents;
+pub mod forms;
+pub mod layouts;
 pub mod records;
 pub mod settings;
 pub mod sql;
