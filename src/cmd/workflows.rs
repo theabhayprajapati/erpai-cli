@@ -13,16 +13,16 @@ pub struct WorkflowsCmd {
 
 #[derive(Subcommand, Debug)]
 pub enum WorkflowsSub {
-    /// List workflows of --app. Output: {data:[{_id,name,active,…}], page}.
+    /// List workflows of --app. Output: {data:[{id,name,active,…}], page}.
     List {
         #[arg(long, default_value_t = 1)]
         page: u32,
         #[arg(long, default_value_t = 50)]
         page_size: u32,
     },
-    /// Get a workflow with nodes and connections. Output: {data:{_id,name,nodes,connections,active,…}}.
+    /// Get a workflow with nodes and connections. Output: {data:{id,name,nodes,connections,active,rev,…}}.
     Get { workflow_id: String },
-    /// Create a workflow from a full graph JSON {name,nodes,connections,settings?}. Output: {data:{_id,…}}. Errors: validation_error (missing name/nodes/connections).
+    /// Create a workflow from a full graph JSON {name,nodes,connections,settings?}. Output: {data:{id,…}}. Errors: validation_error (missing name/nodes/connections).
     Create {
         #[arg(long)]
         body: Option<String>,
@@ -56,21 +56,21 @@ pub enum WorkflowsSub {
     Activate { workflow_id: String },
     /// Stop listening for triggers. Output: {data:{…}}.
     Deactivate { workflow_id: String },
-    /// Run the workflow for real (side effects happen). Output: {data:{executionId?,…}}.
+    /// Run the workflow for real (side effects happen). --input is the trigger payload (sent as triggerData; omit for a manual trigger). Output: {data:{id,status,…}} — the execution id is .data.id.
     Execute {
         workflow_id: String,
         /// Trigger input JSON (default {})
         #[arg(long)]
         input: Option<String>,
     },
-    /// Run one node with the given upstream item as input (real call, side effects happen). Output: {data:{success,outputData,…}}.
+    /// Run one node with the given upstream item as input (sent as testData; real call, side effects happen). Output: {data:{success,outputData,…}}.
     TestNode {
         workflow_id: String,
         node_id: String,
         #[arg(long)]
         input: String,
     },
-    /// List executions of a workflow. Output: {data:[{_id,status,startedAt,…}]}.
+    /// List executions of a workflow. Output: {data:[{id,status,startTime,…}]}.
     Executions {
         workflow_id: String,
         #[arg(long, default_value_t = 10)]
@@ -137,11 +137,11 @@ pub enum NodesSub {
 
 #[derive(Subcommand, Debug)]
 pub enum CredentialsSub {
-    /// List credentials visible to --app. Output: {data:[{_id,name,type,…}]} (secrets are never returned).
+    /// List credentials visible to --app. Output: {data:[{id,name,type,…}]} (secrets are never returned).
     List,
-    /// Get one credential's metadata. Output: {data:{_id,name,type,…}}.
+    /// Get one credential's metadata. Output: {data:{id,name,type,…}}.
     Get { credential_id: String },
-    /// Create a credential {name,type,data:{…}}. Output: {data:{_id,…}}.
+    /// Create a credential {name,type,data:{…}}. Output: {data:{id,…}}.
     Create {
         #[arg(long)]
         body: Option<String>,
@@ -289,8 +289,8 @@ pub async fn run(g: &Global, c: WorkflowsCmd) -> Result<Rendered> {
             .await
         }
         WorkflowsSub::Execute { workflow_id, input } => {
-            let body: Value = match input {
-                Some(s) => serde_json::from_str(&s)?,
+            let body = match input {
+                Some(s) => wrap_under("triggerData", serde_json::from_str(&s)?),
                 None => serde_json::json!({}),
             };
             post_or_plan(
@@ -307,7 +307,7 @@ pub async fn run(g: &Global, c: WorkflowsCmd) -> Result<Rendered> {
             node_id,
             input,
         } => {
-            let body: Value = serde_json::from_str(&input)?;
+            let body = wrap_under("testData", serde_json::from_str(&input)?);
             post_or_plan(
                 &api,
                 gate,
@@ -501,4 +501,13 @@ async fn post_or_plan(
         return Ok(dry_run_plan("POST", path, Some(body), cx));
     }
     Ok(item_from(api.post(path, &[], body).await?).with_context(cx))
+}
+
+/// The engine reads the item under `key`; a body that already carries that key (or an empty
+/// object) is sent as-is so callers can hand over a full request body.
+fn wrap_under(key: &str, input: Value) -> Value {
+    match &input {
+        Value::Object(m) if m.is_empty() || m.contains_key(key) => input,
+        _ => serde_json::json!({ key: input }),
+    }
 }

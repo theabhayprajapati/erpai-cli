@@ -170,3 +170,66 @@ async fn credentials_delete_and_test() {
     );
     assert_eq!(v["data"]["ok"], true);
 }
+
+#[tokio::test]
+async fn execute_and_test_node_wrap_the_input_for_the_engine() {
+    let s = server().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/auto-builder/workflows/w1/execute"))
+        .and(body_json(
+            serde_json::json!({"triggerData":{"recordId":"r1"}}),
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(
+            serde_json::json!({"success":true,"data":{"id":"e1","status":"success"}}),
+        ))
+        .expect(1)
+        .mount(&s)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/v1/auto-builder/workflows/w1/nodes/n1/test-execute"))
+        .and(body_json(serde_json::json!({"testData":{"amount":5}})))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(
+                serde_json::json!({"success":true,"outputData":[{"json":{"ok":true}}]}),
+            ),
+        )
+        .expect(2)
+        .mount(&s)
+        .await;
+    let d = tempfile::tempdir().unwrap();
+    profile_for(&s, d.path(), &["a1"]);
+    let v = stdout_json(
+        &erpai(d.path())
+            .args([
+                "workflows",
+                "execute",
+                "--app",
+                "a1",
+                "w1",
+                "--input",
+                r#"{"recordId":"r1"}"#,
+            ])
+            .assert()
+            .success(),
+    );
+    assert_eq!(v["data"]["id"], "e1");
+    // a bare item is wrapped; a body that already carries testData is sent verbatim
+    for input in [r#"{"amount":5}"#, r#"{"testData":{"amount":5}}"#] {
+        let v = stdout_json(
+            &erpai(d.path())
+                .args([
+                    "workflows",
+                    "test-node",
+                    "--app",
+                    "a1",
+                    "w1",
+                    "n1",
+                    "--input",
+                    input,
+                ])
+                .assert()
+                .success(),
+        );
+        assert_eq!(v["data"]["outputData"][0]["json"]["ok"], true);
+    }
+}
