@@ -89,3 +89,24 @@ async fn columns_delete_is_gated() {
         .code(2);
     assert_eq!(s.received_requests().await.unwrap().len(), 0);
 }
+
+#[tokio::test]
+async fn columns_list_handles_bare_table_object() {
+    let s = server().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/app-builder/table/t1"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "_id":"t1","name":"T","columnsMetaData":[{"id":"c9","name":"X","type":"number","columnCode":"X"}]
+        })))
+        .mount(&s)
+        .await;
+    let d = tempfile::tempdir().unwrap();
+    profile_for(&s, d.path(), &["a1"]);
+    let v = stdout_json(
+        &erpai(d.path())
+            .args(["columns", "list", "--app", "a1", "t1"])
+            .assert()
+            .success(),
+    );
+    assert_eq!(v["data"][0]["id"], "c9");
+}

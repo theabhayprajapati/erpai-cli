@@ -151,8 +151,8 @@ pub async fn run(g: &Global, c: TablesCmd) -> Result<Rendered> {
                 let v = api
                     .get(&format!("/v1/app-builder/table/{table_id}"), &app_q)
                     .await?;
-                let actions: Vec<Value> = v
-                    .pointer("/body/customActions")
+                let actions: Vec<Value> = inner(&v)
+                    .get("customActions")
                     .and_then(Value::as_array)
                     .cloned()
                     .unwrap_or_default()

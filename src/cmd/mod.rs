@@ -59,6 +59,8 @@ pub fn list_from(v: &Value, page: u32, size: u32) -> Rendered {
     let total = v
         .get("totalCount")
         .and_then(Value::as_u64)
+        .or_else(|| v.pointer("/pagination/total").and_then(Value::as_u64))
+        .or_else(|| v.pointer("/pagination/totalCount").and_then(Value::as_u64))
         .unwrap_or(data.len() as u64);
     Output::list(
         data,
@@ -70,15 +72,21 @@ pub fn list_from(v: &Value, page: u32, size: u32) -> Rendered {
     )
 }
 
+/// The platform wraps single objects inconsistently: `{success, body}`,
+/// `{success, data}`, `{success, response}`, or the bare object. Return the object.
+pub fn inner(v: &Value) -> Value {
+    for k in ["body", "data", "response"] {
+        if let Some(x) = v.get(k) {
+            if x.is_object() || x.is_array() {
+                return x.clone();
+            }
+        }
+    }
+    v.clone()
+}
+
 pub fn item_from(v: Value) -> Rendered {
-    let inner = if let Some(b) = v.get("body") {
-        b.clone()
-    } else if let Some(d) = v.get("data") {
-        d.clone()
-    } else {
-        v
-    };
-    Output::item(inner)
+    Output::item(inner(&v))
 }
 
 pub fn read_json_arg(inline: Option<&str>, file: Option<&Path>) -> Result<Value> {

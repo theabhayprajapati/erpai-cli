@@ -70,14 +70,14 @@ pub async fn run(g: &Global, c: SqlCmd) -> Result<Rendered> {
             }
             let body = serde_json::json!({ "appId": app, "sqlQuery": sql, "limit": limit });
             Ok(
-                Output::item(api.post("/v1/agent/app/sql/execute", &[], &body).await?)
+                item_from(api.post("/v1/agent/app/sql/execute", &[], &body).await?)
                     .with_context(cx),
             )
         }
         SqlSub::Generate { prompt } => {
             let body = serde_json::json!({ "appId": app, "prompt": prompt });
             Ok(
-                Output::item(api.post("/v1/agent/app/sql/generate", &[], &body).await?)
+                item_from(api.post("/v1/agent/app/sql/generate", &[], &body).await?)
                     .with_context(cx),
             )
         }

@@ -49,8 +49,8 @@ pub async fn run(g: &Global, c: ColumnsCmd) -> Result<Rendered> {
             let v = api
                 .get(&format!("/v1/app-builder/table/{table_id}"), &app_q)
                 .await?;
-            let cols: Vec<Value> = v
-                .pointer("/body/columnsMetaData")
+            let cols: Vec<Value> = inner(&v)
+                .get("columnsMetaData")
                 .and_then(Value::as_array)
                 .cloned()
                 .unwrap_or_default()

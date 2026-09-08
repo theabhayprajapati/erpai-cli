@@ -18,7 +18,7 @@ async fn sql_schema_and_run() {
         .and(path("/v1/agent/app/sql/execute"))
         .and(body_json(serde_json::json!({"appId":"a1","sqlQuery":"SELECT count() AS n FROM v_a1_orders","limit":100})))
         .respond_with(ResponseTemplate::new(200).set_body_json(
-            serde_json::json!({"rows":[{"n":3}],"fields":[{"name":"n","type":"UInt64"}],"rowCount":1}),
+            serde_json::json!({"success":true,"status":200,"data":{"rows":[{"n":3}],"fields":[{"name":"n","type":"UInt64"}],"rowCount":1}}),
         ))
         .mount(&s)
         .await;
