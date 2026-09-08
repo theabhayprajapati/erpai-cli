@@ -1,0 +1,37 @@
+[package]
+name = "erpai"
+version = "0.2.0"
+edition = "2021"
+rust-version = "1.85"
+description = "ERP AI command-line client for coding agents"
+license = "MIT"
+repository = "https://github.com/erphq/erpai-cli"
+
+[[bin]]
+name = "erpai"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive", "wrap_help"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "time"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+directories = "6"
+rand = "0.9"
+open = "5"
+url = "2"
+base16ct = { version = "0.2", features = ["alloc"] }
+
+[dev-dependencies]
+wiremock = "0.6"
+assert_cmd = "2"
+predicates = "3"
+tempfile = "3"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
