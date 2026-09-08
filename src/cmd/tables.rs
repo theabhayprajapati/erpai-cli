@@ -33,8 +33,9 @@ pub enum TablesSub {
         icon: Option<String>,
         #[arg(long)]
         description: Option<String>,
-        #[arg(long, default_value = "TABLE")]
-        object_type: String,
+        /// Platform object type; omit for an ordinary table (the server picks its default)
+        #[arg(long)]
+        object_type: Option<String>,
     },
     /// Update name/description/category/icon from a JSON body. Output: {data:{…}}.
     Update {
@@ -105,8 +106,10 @@ pub async fn run(g: &Global, c: TablesCmd) -> Result<Rendered> {
             object_type,
         } => {
             // the create endpoint expects appId in the body as well as the query string
-            let mut body =
-                serde_json::json!({ "name": name, "objectType": object_type, "appId": app });
+            let mut body = serde_json::json!({ "name": name, "appId": app });
+            if let Some(o) = object_type {
+                body["objectType"] = o.into();
+            }
             if let Some(c) = category {
                 body["category"] = c.into();
             }

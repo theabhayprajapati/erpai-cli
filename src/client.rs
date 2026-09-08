@@ -174,7 +174,27 @@ async fn backoff(attempt: u32) {
 fn server_message(body: &Value) -> String {
     for k in ["message", "error", "msg"] {
         if let Some(s) = body.get(k).and_then(Value::as_str) {
-            return s.to_string();
+            // validation errors carry the field-level reasons in details[]
+            let details: Vec<String> = body
+                .get("details")
+                .and_then(Value::as_array)
+                .map(|d| {
+                    d.iter()
+                        .filter_map(|e| {
+                            let m = e.get("message").and_then(Value::as_str)?;
+                            Some(match e.get("field").and_then(Value::as_str) {
+                                Some(f) => format!("{f}: {m}"),
+                                None => m.to_string(),
+                            })
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            return if details.is_empty() {
+                s.to_string()
+            } else {
+                format!("{s} — {}", details.join("; "))
+            };
         }
     }
     match body {

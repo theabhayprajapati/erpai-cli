@@ -103,10 +103,12 @@ pub async fn run(g: &Global, c: PagesCmd) -> Result<Rendered> {
             let v = api
                 .get(BASE, &[("appId", app.as_str()), ("limit", lim.as_str())])
                 .await?;
-            let data = v
+            let x = inner(&v);
+            let data = x
                 .get("data")
                 .and_then(Value::as_array)
                 .cloned()
+                .or_else(|| x.as_array().cloned())
                 .unwrap_or_default();
             Ok(Output::list(data, None).with_context(cx))
         }

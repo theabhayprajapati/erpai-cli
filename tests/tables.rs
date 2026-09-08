@@ -28,7 +28,7 @@ async fn tables_create_and_delete_gated() {
         .and(path("/v1/app-builder/table"))
         .and(query_param("appId", "a1"))
         .and(body_json(
-            serde_json::json!({"name":"Orders","objectType":"TABLE","category":"Sales","appId":"a1"}),
+            serde_json::json!({"name":"Orders","category":"Sales","appId":"a1"}),
         ))
         .respond_with(
             ResponseTemplate::new(200).set_body_json(

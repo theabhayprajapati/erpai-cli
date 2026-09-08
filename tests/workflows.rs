@@ -89,7 +89,7 @@ async fn execute_dry_run_sends_nothing_and_options_posts_body() {
         .and(path(
             "/v1/auto-builder/nodes/appEventTrigger/parameters/customActionName/options",
         ))
-        .and(body_json(serde_json::json!({"tableId":"t1"})))
+        .and(body_json(serde_json::json!({"tableId":"t1","appId":"a1"})))
         .respond_with(ResponseTemplate::new(200).set_body_json(
             serde_json::json!({"success":true,"data":[{"name":"Convert","value":"aB3x"}]}),
         ))

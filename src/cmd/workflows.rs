@@ -184,10 +184,11 @@ fn require_graph(body: &Value) -> Result<()> {
 }
 
 fn list_any(v: &Value) -> Vec<Value> {
-    v.as_array()
+    let x = inner(v);
+    x.as_array()
         .cloned()
-        .or_else(|| v.get("data").and_then(Value::as_array).cloned())
-        .or_else(|| v.get("body").and_then(Value::as_array).cloned())
+        .or_else(|| x.get("data").and_then(Value::as_array).cloned())
+        .or_else(|| x.get("executions").and_then(Value::as_array).cloned())
         .unwrap_or_default()
 }
 
@@ -419,7 +420,11 @@ pub async fn run(g: &Global, c: WorkflowsCmd) -> Result<Rendered> {
                 param,
                 body,
             } => {
-                let body: Value = serde_json::from_str(&body)?;
+                let mut body: Value = serde_json::from_str(&body)?;
+                // the option loaders read appId from the body, not the query string
+                if body.is_object() && body.get("appId").is_none() {
+                    body["appId"] = app.clone().into();
+                }
                 let v = api
                     .post(
                         &format!("{BASE}/nodes/{node_type}/parameters/{param}/options"),

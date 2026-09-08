@@ -131,8 +131,7 @@ pub async fn run(g: &Global, c: DocumentsCmd) -> Result<Rendered> {
                 }
                 None => serde_json::json!([]),
             };
-            let mut body =
-                serde_json::json!({ "name": name, "content": content, "isDraft": draft });
+            let mut body = serde_json::json!({ "name": name, "content": content, "isDraft": draft, "appId": app });
             if let Some(e) = emoji {
                 body["emoji"] = e.into();
             }
