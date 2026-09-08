@@ -93,7 +93,13 @@ pub async fn run(g: &Global, c: DocumentsCmd) -> Result<Rendered> {
             page,
             page_size,
         } => {
+            // this endpoint alone pages from 0; the CLI keeps 1-based pages everywhere
             let mut pairs = page_args(page, page_size)?;
+            for (k, v) in pairs.iter_mut() {
+                if k == "pageNo" {
+                    *v = page.saturating_sub(1).to_string();
+                }
+            }
             pairs.push(("appId".into(), app.clone()));
             if let Some(s) = search {
                 pairs.push(("q".into(), s));

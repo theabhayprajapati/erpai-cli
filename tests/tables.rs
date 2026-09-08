@@ -1,6 +1,6 @@
 mod common;
 use common::*;
-use wiremock::matchers::{body_string_contains, body_json, method, path, query_param};
+use wiremock::matchers::{body_json, body_string_contains, method, path, query_param};
 use wiremock::{Mock, ResponseTemplate};
 
 #[tokio::test]
