@@ -49,6 +49,14 @@ impl Profile {
     }
 
     /// Identity summary safe to print (never the key itself).
+    /// Human label for confirmations: org name, else org id, else the profile name.
+    pub fn org_label(&self) -> String {
+        self.org_name
+            .clone()
+            .or_else(|| self.org_id.clone())
+            .unwrap_or_else(|| format!("profile '{}'", self.name))
+    }
+
     pub fn identity(&self) -> serde_json::Value {
         serde_json::json!({
             "profile": self.name,

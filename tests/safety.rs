@@ -116,7 +116,8 @@ async fn wrong_app_never_sends_a_request_in_any_group() {
         vec!["roles", "list"],
         vec!["pages", "list"],
         vec!["widgets", "list"],
-        vec!["catalog", "source-app"],
+        vec!["catalog", "source-publication"],
+        vec!["catalog", "get", "crm"],
         vec!["attachments", "upload", h],
     ];
     for c in cases {

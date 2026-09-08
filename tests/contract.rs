@@ -173,13 +173,27 @@ fn every_leaf_command_in_every_group_documents_output_shape() {
         (
             &["catalog"],
             &[
+                "list",
                 "get",
-                "source-app",
+                "source-publication",
+                "source-draft",
                 "draft",
                 "preview",
                 "publish",
                 "unpublish",
+                "activate",
                 "install",
+            ],
+        ),
+        (
+            &["catalog", "publisher"],
+            &[
+                "overview",
+                "terms",
+                "accept-terms",
+                "profile",
+                "set-profile",
+                "claim",
             ],
         ),
         (&["attachments"], &["upload", "download-url"]),
