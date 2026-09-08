@@ -6,11 +6,15 @@ use wiremock::{Mock, ResponseTemplate};
 #[tokio::test]
 async fn layouts_validate_type_and_pass_kanban_through() {
     let s = server().await;
-    let kanban = serde_json::json!({"tableId":"t1","name":"Board","layoutType":"kanban","config":{"selectedColumn":"c1","boardColsToBeDisplayed":["1","2"],"selectedDisplayColumns":["c2"]}});
+    let kanban = serde_json::json!({"tableId":"t1","name":"Board","viewType":"kanban","config":{"selectedColumn":"c1","boardColsToBeDisplayed":["1","2"],"selectedDisplayColumns":["c2"]}});
     Mock::given(method("POST"))
         .and(path("/v1/app-builder/layout"))
         .and(query_param("appId", "a1"))
-        .and(body_json(kanban.clone()))
+        .and(body_json({
+            let mut k = kanban.clone();
+            k["layoutType"] = "kanban".into();
+            k
+        }))
         .respond_with(
             ResponseTemplate::new(200)
                 .set_body_json(serde_json::json!({"success":true,"body":{"_id":"l1"}})),
@@ -27,7 +31,7 @@ async fn layouts_validate_type_and_pass_kanban_through() {
             "--app",
             "a1",
             "--body",
-            r#"{"tableId":"t1","name":"x","layoutType":"board","config":{}}"#,
+            r#"{"tableId":"t1","name":"x","viewType":"board","config":{}}"#,
         ])
         .assert()
         .code(2);

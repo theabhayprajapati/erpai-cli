@@ -20,7 +20,7 @@ pub enum LayoutsSub {
     },
     /// Get one layout. Output: {data:{_id,name,layoutType,config,…}}.
     Get { layout_id: String },
-    /// Create a view from {tableId,name,layoutType,config,default?}. layoutType: tabular|kanban|calendar|gallery|timeline. Output: {data:{_id,…}}.
+    /// Create a view from {tableId,name,viewType,config,default?}. viewType: tabular|kanban|calendar|gallery|timeline (layoutType accepted too). Output: {data:{_id,…}}.
     Create {
         #[arg(long)]
         body: Option<String>,
@@ -67,19 +67,28 @@ pub async fn run(g: &Global, c: LayoutsCmd) -> Result<Rendered> {
         )
         .with_context(cx)),
         LayoutsSub::Create { body, file } => {
-            let body = read_json_arg(body.as_deref(), file.as_deref())?;
-            for k in ["tableId", "name", "layoutType", "config"] {
+            let mut body = read_json_arg(body.as_deref(), file.as_deref())?;
+            for k in ["tableId", "name", "config"] {
                 if body.get(k).is_none() {
                     return Err(CliError::validation(format!("layout body needs {k}")));
                 }
             }
-            let lt = body["layoutType"].as_str().unwrap_or("");
-            if !LAYOUT_TYPES.contains(&lt) {
+            // The platform's create endpoint reads `viewType`; docs historically said `layoutType`.
+            // Accept either, validate the value, and send both so either server version is happy.
+            let lt = body
+                .get("viewType")
+                .or(body.get("layoutType"))
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string();
+            if !LAYOUT_TYPES.contains(&lt.as_str()) {
                 return Err(CliError::validation(format!(
-                    "layoutType '{lt}' is not one of {}",
+                    "viewType '{lt}' is not one of {}",
                     LAYOUT_TYPES.join(", ")
                 )));
             }
+            body["viewType"] = Value::String(lt.clone());
+            body["layoutType"] = Value::String(lt);
             if gate.dry_run {
                 return Ok(dry_run_plan(
                     "POST",
