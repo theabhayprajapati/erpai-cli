@@ -10,6 +10,7 @@ async fn apps_list_prints_list_envelope() {
         .and(path("/v1/app-builder/app"))
         .and(query_param("pageNo", "1"))
         .and(query_param("pageSize", "30"))
+        .and(query_param("sortCol", "updatedAt"))
         .respond_with(
             ResponseTemplate::new(200).set_body_json(
                 serde_json::json!({"data":[{"_id":"a1","name":"CRM"}],"totalCount":1}),

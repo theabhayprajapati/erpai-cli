@@ -32,7 +32,7 @@ pub async fn run(g: &Global, c: AppsCmd) -> Result<Rendered> {
             page_size,
         } => {
             let mut pairs = page_args(page, page_size)?;
-            pairs.push(("sortCol".into(), "UTDT".into()));
+            pairs.push(("sortCol".into(), "updatedAt".into()));
             pairs.push(("sortDir".into(), "-1".into()));
             if let Some(s) = search {
                 pairs.push(("q".into(), s));
