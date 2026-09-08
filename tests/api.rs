@@ -104,3 +104,60 @@ async fn api_post_dry_run_and_delete_gated() {
         0
     );
 }
+
+#[tokio::test]
+async fn api_forwards_extra_headers_but_never_reserved_ones() {
+    let s = server().await;
+    Mock::given(method("PUT"))
+        .and(path(
+            "/v1/app-builder/command-centre/a1/external-access/vendor-portal",
+        ))
+        .and(wiremock::matchers::header("x-erpai-contract-version", "7"))
+        .and(wiremock::matchers::header("x-erpai-contract-digest", "abc"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(
+            serde_json::json!({"success":true,"data":{"slug":"vendor-portal","version":8}}),
+        ))
+        .expect(1)
+        .mount(&s)
+        .await;
+    let d = tempfile::tempdir().unwrap();
+    profile_for(&s, d.path(), &["a1"]);
+    let v = stdout_json(
+        &erpai(d.path())
+            .args([
+                "api",
+                "put",
+                "/v1/app-builder/command-centre/a1/external-access/vendor-portal",
+                "--app",
+                "a1",
+                "--body",
+                r#"{"slug":"vendor-portal"}"#,
+                "--header",
+                "X-ERPAI-Contract-Version: 7",
+                "--header",
+                "X-ERPAI-Contract-Digest: abc",
+            ])
+            .assert()
+            .success(),
+    );
+    assert_eq!(v["data"]["version"], 8);
+    for bad in [
+        "Authorization: Bearer x",
+        "x-gateway-user-id: u1",
+        "no-colon",
+    ] {
+        erpai(d.path())
+            .args([
+                "api",
+                "get",
+                "/v1/app-builder/app",
+                "--app",
+                "a1",
+                "--header",
+                bad,
+            ])
+            .assert()
+            .code(2);
+    }
+    assert_eq!(s.received_requests().await.unwrap().len(), 1);
+}

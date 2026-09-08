@@ -19,6 +19,40 @@ pub struct ApiCmd {
     pub body: Option<String>,
     #[arg(long)]
     pub file: Option<PathBuf>,
+    /// Extra request header as "Name: value" (repeatable), e.g. the contract precondition headers.
+    /// Authorization, cookie and gateway identity headers are never overridable.
+    #[arg(long = "header", value_name = "NAME: VALUE")]
+    pub header: Vec<String>,
+}
+
+const RESERVED_HEADERS: [&str; 6] = [
+    "authorization",
+    "cookie",
+    "host",
+    "content-length",
+    "accept",
+    "content-type",
+];
+
+fn parse_headers(raw: &[String]) -> Result<Vec<(String, String)>> {
+    let mut out = Vec::with_capacity(raw.len());
+    for h in raw {
+        let (k, v) = h
+            .split_once(':')
+            .ok_or_else(|| CliError::validation(format!("--header '{h}' must be 'Name: value'")))?;
+        let name = k.trim().to_ascii_lowercase();
+        if name.is_empty()
+            || RESERVED_HEADERS.contains(&name.as_str())
+            || name.starts_with("x-gateway-")
+        {
+            return Err(CliError::validation(format!(
+                "--header '{}' is not overridable",
+                k.trim()
+            )));
+        }
+        out.push((name, v.trim().to_string()));
+    }
+    Ok(out)
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum, PartialEq, Eq)]
@@ -42,6 +76,7 @@ pub async fn run(g: &Global, c: ApiCmd) -> Result<Rendered> {
             "path must not contain '..' or a query string (use --query)",
         ));
     }
+    let headers = parse_headers(&c.header)?;
     let mut pairs: Vec<(String, String)> = Vec::new();
     for q in &c.query {
         let (k, v) = q
@@ -83,25 +118,37 @@ pub async fn run(g: &Global, c: ApiCmd) -> Result<Rendered> {
             Output::item(x)
         }
     };
+    let http_method = match c.method {
+        Method::Get => reqwest::Method::GET,
+        Method::Post => reqwest::Method::POST,
+        Method::Put => reqwest::Method::PUT,
+        Method::Patch => reqwest::Method::PATCH,
+        Method::Delete => reqwest::Method::DELETE,
+    };
     match c.method {
-        Method::Get => Ok(render(api.get(&c.path, &qv).await?).with_context(cx)),
+        Method::Get => Ok(render(
+            api.request(http_method, &c.path, &qv, None, &headers)
+                .await?,
+        )
+        .with_context(cx)),
         Method::Delete => match gate.confirm(&format!("DELETE {}", c.path), &cx)? {
             Decision::DryRun => Ok(dry_run_plan("DELETE", &c.path, body.as_ref(), cx)),
-            Decision::Proceed => {
-                Ok(render(api.delete(&c.path, &qv, body.as_ref()).await?).with_context(cx))
-            }
+            Decision::Proceed => Ok(render(
+                api.request(http_method, &c.path, &qv, body.as_ref(), &headers)
+                    .await?,
+            )
+            .with_context(cx)),
         },
         Method::Post | Method::Put | Method::Patch => {
             let b = body.unwrap_or_else(|| serde_json::json!({}));
             if gate.dry_run {
                 return Ok(dry_run_plan(method_name, &c.path, Some(&b), cx));
             }
-            let v = match c.method {
-                Method::Post => api.post(&c.path, &qv, &b).await?,
-                Method::Put => api.put(&c.path, &qv, &b).await?,
-                _ => api.patch(&c.path, &qv, &b).await?,
-            };
-            Ok(render(v).with_context(cx))
+            Ok(render(
+                api.request(http_method, &c.path, &qv, Some(&b), &headers)
+                    .await?,
+            )
+            .with_context(cx))
         }
     }
 }

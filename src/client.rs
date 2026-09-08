@@ -26,16 +26,16 @@ impl ApiClient {
     }
 
     pub async fn get(&self, path: &str, query: &[(&str, &str)]) -> Result<Value> {
-        self.send(Method::GET, path, query, None).await
+        self.send(Method::GET, path, query, None, &[]).await
     }
     pub async fn post(&self, path: &str, query: &[(&str, &str)], body: &Value) -> Result<Value> {
-        self.send(Method::POST, path, query, Some(body)).await
+        self.send(Method::POST, path, query, Some(body), &[]).await
     }
     pub async fn put(&self, path: &str, query: &[(&str, &str)], body: &Value) -> Result<Value> {
-        self.send(Method::PUT, path, query, Some(body)).await
+        self.send(Method::PUT, path, query, Some(body), &[]).await
     }
     pub async fn patch(&self, path: &str, query: &[(&str, &str)], body: &Value) -> Result<Value> {
-        self.send(Method::PATCH, path, query, Some(body)).await
+        self.send(Method::PATCH, path, query, Some(body), &[]).await
     }
     pub async fn delete(
         &self,
@@ -43,7 +43,20 @@ impl ApiClient {
         query: &[(&str, &str)],
         body: Option<&Value>,
     ) -> Result<Value> {
-        self.send(Method::DELETE, path, query, body).await
+        self.send(Method::DELETE, path, query, body, &[]).await
+    }
+
+    /// Any method with caller-supplied extra headers (the `erpai api --header` path). The
+    /// authorization and accept headers are always the client's own.
+    pub async fn request(
+        &self,
+        method: Method,
+        path: &str,
+        query: &[(&str, &str)],
+        body: Option<&Value>,
+        headers: &[(String, String)],
+    ) -> Result<Value> {
+        self.send(method, path, query, body, headers).await
     }
 
     /// Multipart upload (the one non-JSON request shape). Same auth, error mapping and public-path rule.
@@ -94,6 +107,7 @@ impl ApiClient {
         path: &str,
         query: &[(&str, &str)],
         body: Option<&Value>,
+        headers: &[(String, String)],
     ) -> Result<Value> {
         if !(path.starts_with("/v1/") || path.starts_with("/open/v1/")) {
             debug_assert!(false, "non-public path {path}");
@@ -110,6 +124,9 @@ impl ApiClient {
                 .query(query)
                 .header("authorization", format!("Bearer {}", self.key))
                 .header("accept", "application/json");
+            for (k, v) in headers {
+                req = req.header(k.as_str(), v.as_str());
+            }
             if let Some(b) = body {
                 req = req.json(b);
             }
