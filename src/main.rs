@@ -42,6 +42,7 @@ async fn run(cli: Cli) -> erpai::error::Result<output::Rendered> {
         Command::Columns(c) => cmd::columns::run(&g, c).await,
         Command::Records(c) => cmd::records::run(&g, c).await,
         Command::Sql(c) => cmd::sql::run(&g, c).await,
+        Command::Workflows(c) => cmd::workflows::run(&g, c).await,
         Command::Login(a) => auth::login(&g, a).await,
         Command::Logout => auth::logout(&g).await,
         Command::Whoami => auth::whoami(&g).await,

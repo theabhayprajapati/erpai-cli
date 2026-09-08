@@ -46,6 +46,8 @@ pub enum Command {
     Records(crate::cmd::records::RecordsCmd),
     /// SQL over an app's data (--app)
     Sql(crate::cmd::sql::SqlCmd),
+    /// Workflows (automations) of an app (--app)
+    Workflows(crate::cmd::workflows::WorkflowsCmd),
     /// Sign in (browser) or store an API key
     Login(crate::auth::LoginArgs),
     /// Revoke the stored key and forget the profile

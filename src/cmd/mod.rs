@@ -4,6 +4,7 @@ pub mod records;
 pub mod settings;
 pub mod sql;
 pub mod tables;
+pub mod workflows;
 
 use crate::cli::Global;
 use crate::client::ApiClient;
