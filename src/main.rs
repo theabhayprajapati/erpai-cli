@@ -51,6 +51,7 @@ async fn run(cli: Cli) -> erpai::error::Result<output::Rendered> {
         Command::Widgets(c) => cmd::widgets::run(&g, c).await,
         Command::Catalog(c) => cmd::catalog::run(&g, c).await,
         Command::Attachments(c) => cmd::attachments::run(&g, c).await,
+        Command::Api(c) => cmd::api::run(&g, c).await,
         Command::Login(a) => auth::login(&g, a).await,
         Command::Logout => auth::logout(&g).await,
         Command::Whoami => auth::whoami(&g).await,

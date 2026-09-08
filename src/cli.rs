@@ -64,6 +64,8 @@ pub enum Command {
     Catalog(crate::cmd::catalog::CatalogCmd),
     /// Private record attachments (--app)
     Attachments(crate::cmd::attachments::AttachmentsCmd),
+    /// Generic request to a public endpoint without a dedicated command. Output: {data:…}. GET is read-only; POST/PUT/PATCH honour --dry-run; DELETE is destructive-gated.
+    Api(crate::cmd::api::ApiCmd),
     /// Sign in (browser) or store an API key
     Login(crate::auth::LoginArgs),
     /// Revoke the stored key and forget the profile
