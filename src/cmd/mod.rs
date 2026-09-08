@@ -1,12 +1,17 @@
 pub mod apps;
+pub mod attachments;
+pub mod catalog;
 pub mod columns;
 pub mod documents;
 pub mod forms;
 pub mod layouts;
+pub mod pages;
 pub mod records;
+pub mod roles;
 pub mod settings;
 pub mod sql;
 pub mod tables;
+pub mod widgets;
 pub mod workflows;
 
 use crate::cli::Global;

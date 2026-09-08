@@ -54,6 +54,16 @@ pub enum Command {
     Forms(crate::cmd::forms::FormsCmd),
     /// Rich-text documents and folders (--app)
     Documents(crate::cmd::documents::DocumentsCmd),
+    /// Roles, user access, invitations (--app)
+    Roles(crate::cmd::roles::RolesCmd),
+    /// Custom HTML pages and the home page (--app)
+    Pages(crate::cmd::pages::PagesCmd),
+    /// Insights widgets above tables (--app, --table)
+    Widgets(crate::cmd::widgets::WidgetsCmd),
+    /// Public template catalog publishing (--app)
+    Catalog(crate::cmd::catalog::CatalogCmd),
+    /// Private record attachments (--app)
+    Attachments(crate::cmd::attachments::AttachmentsCmd),
     /// Sign in (browser) or store an API key
     Login(crate::auth::LoginArgs),
     /// Revoke the stored key and forget the profile
