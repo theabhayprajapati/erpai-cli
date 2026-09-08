@@ -131,7 +131,7 @@ pub async fn run(g: &Global, c: DocumentsCmd) -> Result<Rendered> {
                 }
                 None => serde_json::json!([]),
             };
-            let mut body = serde_json::json!({ "name": name, "content": content, "isDraft": draft, "appId": app });
+            let mut body = serde_json::json!({ "title": name, "content": content, "isDraft": draft, "appId": app });
             if let Some(e) = emoji {
                 body["emoji"] = e.into();
             }
@@ -187,12 +187,7 @@ pub async fn run(g: &Global, c: DocumentsCmd) -> Result<Rendered> {
                 let v = api
                     .get("/v1/app-builder/app-document-folder", &app_q)
                     .await?;
-                let data = v
-                    .get("data")
-                    .or(v.get("body"))
-                    .and_then(Value::as_array)
-                    .cloned()
-                    .unwrap_or_default();
+                let data = list_items(&v);
                 Ok(Output::list(data, None).with_context(cx))
             }
             FoldersSub::Create { name } => {

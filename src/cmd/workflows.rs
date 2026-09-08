@@ -184,12 +184,21 @@ fn require_graph(body: &Value) -> Result<()> {
 }
 
 fn list_any(v: &Value) -> Vec<Value> {
+    list_items(v)
+}
+
+/// Option loaders report their own failure as `{success:false,error}` inside a 200.
+fn loader_error(v: &Value) -> Result<()> {
     let x = inner(v);
-    x.as_array()
-        .cloned()
-        .or_else(|| x.get("data").and_then(Value::as_array).cloned())
-        .or_else(|| x.get("executions").and_then(Value::as_array).cloned())
-        .unwrap_or_default()
+    if x.get("success") == Some(&Value::Bool(false)) {
+        let msg = x
+            .get("error")
+            .or(x.get("message"))
+            .and_then(Value::as_str)
+            .unwrap_or("option loader failed");
+        return Err(CliError::api(200, msg.to_string()));
+    }
+    Ok(())
 }
 
 pub async fn run(g: &Global, c: WorkflowsCmd) -> Result<Rendered> {
@@ -432,6 +441,7 @@ pub async fn run(g: &Global, c: WorkflowsCmd) -> Result<Rendered> {
                         &body,
                     )
                     .await?;
+                loader_error(&v)?;
                 Ok(Output::list(list_any(&v), None).with_context(cx))
             }
         },

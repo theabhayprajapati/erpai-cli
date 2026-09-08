@@ -32,7 +32,7 @@ async fn columns_add_single_and_bulk() {
     let s = server().await;
     Mock::given(method("POST"))
         .and(path("/v1/app-builder/table/t1/column"))
-        .and(body_json(serde_json::json!({"name":"Status","type":"select","options":[{"name":"Open","color":"blue"}]})))
+        .and(body_json(serde_json::json!({"name":"Status","type":"select","options":[{"id":"1","name":"Open","color":"blue"}]})))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({"success":true,"body":{"id":"c2"}})))
         .expect(1)
         .mount(&s)

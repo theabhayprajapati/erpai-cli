@@ -10,7 +10,7 @@ async fn documents_create_defaults_and_folders_delete_gated() {
         .and(path("/v1/app-builder/app-document"))
         .and(query_param("appId", "a1"))
         .and(body_json(
-            serde_json::json!({"name":"Notes","content":[],"isDraft":false,"appId":"a1"}),
+            serde_json::json!({"title":"Notes","content":[],"isDraft":false,"appId":"a1"}),
         ))
         .respond_with(
             ResponseTemplate::new(200)

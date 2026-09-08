@@ -1,6 +1,6 @@
 mod common;
 use common::*;
-use wiremock::matchers::{body_json, method, path, query_param};
+use wiremock::matchers::{body_string_contains, body_json, method, path, query_param};
 use wiremock::{Mock, ResponseTemplate};
 
 #[tokio::test]
@@ -27,9 +27,10 @@ async fn tables_create_and_delete_gated() {
     Mock::given(method("POST"))
         .and(path("/v1/app-builder/table"))
         .and(query_param("appId", "a1"))
-        .and(body_json(
-            serde_json::json!({"name":"Orders","category":"Sales","appId":"a1"}),
-        ))
+        .and(body_string_contains("\"name\":\"Orders\""))
+        .and(body_string_contains("\"category\":\"Sales\""))
+        .and(body_string_contains("\"columnsMetaData\""))
+        .and(body_string_contains("\"NAME\""))
         .respond_with(
             ResponseTemplate::new(200).set_body_json(
                 serde_json::json!({"success":true,"body":{"_id":"t1","name":"Orders"}}),

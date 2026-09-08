@@ -74,12 +74,7 @@ pub async fn run(g: &Global, c: FormsCmd) -> Result<Rendered> {
             let v = api
                 .get(&format!("/v1/app-builder/app/{app}/entry-form"), &[])
                 .await?;
-            let data = v
-                .get("body")
-                .or(v.get("data"))
-                .and_then(Value::as_array)
-                .cloned()
-                .unwrap_or_default();
+            let data = list_items(&v);
             Ok(Output::list(data, None).with_context(cx))
         }
         FormsSub::Set { table, body, file } => {

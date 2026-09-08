@@ -76,7 +76,8 @@ pub async fn run(g: &Global, c: ColumnsCmd) -> Result<Rendered> {
             body,
             file,
         } => {
-            let body = read_json_arg(body.as_deref(), file.as_deref())?;
+            let mut body = read_json_arg(body.as_deref(), file.as_deref())?;
+            fill_option_ids(&mut body);
             let (path, payload) = if body.is_array() {
                 (
                     format!("/v1/app-builder/table/{table_id}/column/bulk"),
@@ -121,6 +122,25 @@ pub async fn run(g: &Global, c: ColumnsCmd) -> Result<Rendered> {
                     api.delete(&path, &app_q, None).await?;
                     Ok(Output::message(format!("column {column_id} deleted")).with_context(cx))
                 }
+            }
+        }
+    }
+}
+
+/// Select options are stored by id; the API requires one per option. Assign the
+/// 1-based position when the caller left it out (the ids select cells refer to).
+fn fill_option_ids(body: &mut Value) {
+    let cols: Vec<&mut Value> = match body {
+        Value::Array(a) => a.iter_mut().collect(),
+        other => vec![other],
+    };
+    for col in cols {
+        let Some(opts) = col.get_mut("options").and_then(Value::as_array_mut) else {
+            continue;
+        };
+        for (i, o) in opts.iter_mut().enumerate() {
+            if o.is_object() && o.get("id").is_none() {
+                o["id"] = Value::String((i + 1).to_string());
             }
         }
     }

@@ -39,11 +39,7 @@ pub async fn run(g: &Global, c: SqlCmd) -> Result<Rendered> {
             let v = api
                 .get("/v1/agent/app/sql/tables", &[("appId", app.as_str())])
                 .await?;
-            let data = v
-                .as_array()
-                .cloned()
-                .or_else(|| v.get("data").and_then(Value::as_array).cloned())
-                .unwrap_or_default();
+            let data = list_items(&v);
             Ok(Output::list(data, None).with_context(cx))
         }
         SqlSub::Run { query, file, limit } => {

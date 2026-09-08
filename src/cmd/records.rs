@@ -235,12 +235,7 @@ pub async fn run(g: &Global, c: RecordsCmd) -> Result<Rendered> {
                     &serde_json::json!({ "arr": ids }),
                 )
                 .await?;
-            let data = v
-                .get("data")
-                .or(v.get("body"))
-                .and_then(Value::as_array)
-                .cloned()
-                .unwrap_or_default();
+            let data = list_items(&v);
             Ok(Output::list(data, None).with_context(cx))
         }
         RecordsSub::Create {

@@ -51,15 +51,32 @@ pub fn page_args(page: u32, size: u32) -> Result<Vec<(String, String)>> {
     ])
 }
 
+/// The items of a list response, whatever the service's envelope: a bare array,
+/// `{data:[…]}`, `{success,body:[…]}`, `{success,response:{data:[…]}}`,
+/// `{content:[…]}` (Spring-style paging) or `{data:{executions:[…]}}`.
+pub fn list_items(v: &Value) -> Vec<Value> {
+    let x = inner(v);
+    if let Some(a) = x.as_array() {
+        return a.clone();
+    }
+    for k in ["data", "content", "executions", "items"] {
+        if let Some(a) = x.get(k).and_then(Value::as_array) {
+            return a.clone();
+        }
+    }
+    Vec::new()
+}
+
 pub fn list_from(v: &Value, page: u32, size: u32) -> Rendered {
-    let data = v
-        .get("data")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
+    let data = list_items(v);
+    let x = inner(v);
     let total = v
         .get("totalCount")
         .and_then(Value::as_u64)
+        .or_else(|| x.get("totalCount").and_then(Value::as_u64))
+        .or_else(|| x.get("totalElements").and_then(Value::as_u64))
+        .or_else(|| x.pointer("/pagination/total").and_then(Value::as_u64))
+        .or_else(|| x.pointer("/pagination/totalCount").and_then(Value::as_u64))
         .or_else(|| v.pointer("/pagination/total").and_then(Value::as_u64))
         .or_else(|| v.pointer("/pagination/totalCount").and_then(Value::as_u64))
         .unwrap_or(data.len() as u64);
@@ -87,7 +104,12 @@ pub fn inner(v: &Value) -> Value {
 }
 
 pub fn item_from(v: Value) -> Rendered {
-    Output::item(inner(&v))
+    let x = inner(&v);
+    // some create endpoints answer with a one-element array for a single item
+    match x.as_array() {
+        Some(a) if a.len() == 1 && a[0].is_object() => Output::item(a[0].clone()),
+        _ => Output::item(x),
+    }
 }
 
 pub fn read_json_arg(inline: Option<&str>, file: Option<&Path>) -> Result<Value> {

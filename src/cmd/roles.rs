@@ -62,12 +62,7 @@ pub enum RolesSub {
 }
 
 fn list_any(v: &Value) -> Vec<Value> {
-    v.get("data")
-        .or(v.get("body"))
-        .and_then(Value::as_array)
-        .cloned()
-        .or_else(|| v.as_array().cloned())
-        .unwrap_or_default()
+    list_items(v)
 }
 
 pub async fn run(g: &Global, c: RolesCmd) -> Result<Rendered> {

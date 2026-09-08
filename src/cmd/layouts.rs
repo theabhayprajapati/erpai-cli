@@ -13,12 +13,12 @@ pub struct LayoutsCmd {
 
 #[derive(Subcommand, Debug)]
 pub enum LayoutsSub {
-    /// List a table's saved views. Output: {data:[{_id,name,layoutType,…}]}.
+    /// List a table's saved views. Output: {data:[{_id,name,viewType,…}]}.
     List {
         #[arg(long)]
         table: String,
     },
-    /// Get one layout. Output: {data:{_id,name,layoutType,config,…}}.
+    /// Get one layout. Output: {data:{_id,name,viewType,config,…}}.
     Get { layout_id: String },
     /// Create a view from {tableId,name,viewType,config,default?}. viewType: tabular|kanban|calendar|gallery|timeline (layoutType accepted too). Output: {data:{_id,…}}.
     Create {
@@ -54,11 +54,7 @@ pub async fn run(g: &Global, c: LayoutsCmd) -> Result<Rendered> {
                     &[("tableId", table.as_str()), ("appId", app.as_str())],
                 )
                 .await?;
-            let data = v
-                .get("data")
-                .and_then(Value::as_array)
-                .cloned()
-                .unwrap_or_default();
+            let data = list_items(&v);
             Ok(Output::list(data, None).with_context(cx))
         }
         LayoutsSub::Get { layout_id } => Ok(item_from(

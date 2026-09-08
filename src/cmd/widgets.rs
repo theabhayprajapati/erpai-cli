@@ -52,12 +52,7 @@ pub async fn run(g: &Global, c: WidgetsCmd) -> Result<Rendered> {
         .with_context(cx)),
         WidgetsSub::List => {
             let v = api.get(BASE, &app_q).await?;
-            let data = v
-                .get("data")
-                .or(v.get("body"))
-                .and_then(Value::as_array)
-                .cloned()
-                .unwrap_or_default();
+            let data = list_items(&v);
             Ok(Output::list(data, None).with_context(cx))
         }
         WidgetsSub::Set { table, html_file } => {

@@ -22,10 +22,13 @@ pub enum TablesSub {
     },
     /// Get one table with its columnsMetaData. Output: {data:{_id,name,columnsMetaData:[…]}}. Errors: not_found, forbidden.
     Get { table_id: String },
-    /// Create a table (a Name column and an Id column are created automatically). Output: {data:{_id,name,columnsMetaData}}.
+    /// Create a table with the same Id (auto_seq) and Name (text) columns the app creates, unless --no-default-columns. Output: {data:{id,name}} — the new table id is .data.id.
     Create {
         #[arg(long)]
         name: String,
+        /// Create only the system columns (no Id / Name column)
+        #[arg(long)]
+        no_default_columns: bool,
         #[arg(long)]
         category: Option<String>,
         /// Lucide icon name in PascalCase, e.g. ShoppingCart
@@ -104,9 +107,16 @@ pub async fn run(g: &Global, c: TablesCmd) -> Result<Rendered> {
             icon,
             description,
             object_type,
+            no_default_columns,
         } => {
             // the create endpoint expects appId in the body as well as the query string
             let mut body = serde_json::json!({ "name": name, "appId": app });
+            if !no_default_columns {
+                body["columnsMetaData"] = serde_json::json!([
+                    { "id": "ID", "type": "auto_seq", "required": false, "name": "Id", "width": 150, "columnCode": "id", "editable": true },
+                    { "id": "NAME", "type": "text", "required": false, "name": "Name", "width": 200, "columnCode": "name", "editable": true }
+                ]);
+            }
             if let Some(o) = object_type {
                 body["objectType"] = o.into();
             }

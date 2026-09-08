@@ -103,13 +103,7 @@ pub async fn run(g: &Global, c: PagesCmd) -> Result<Rendered> {
             let v = api
                 .get(BASE, &[("appId", app.as_str()), ("limit", lim.as_str())])
                 .await?;
-            let x = inner(&v);
-            let data = x
-                .get("data")
-                .and_then(Value::as_array)
-                .cloned()
-                .or_else(|| x.as_array().cloned())
-                .unwrap_or_default();
+            let data = list_items(&v);
             Ok(Output::list(data, None).with_context(cx))
         }
         PagesSub::Get { slug } => {
