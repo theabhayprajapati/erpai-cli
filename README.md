@@ -46,8 +46,9 @@ erpai doctor                # profile, base URL, credential — exit code is the
 | `documents` | documents and folders |
 | `roles` | roles, users, assign/remove, invitations |
 | `pages` · `widgets` | custom pages, home config, table insight widgets |
-| `catalog` | draft, preview, publish, unpublish, install |
+| `catalog` | `list`, `get`, `activate` (the customer journey), `install`, `publisher overview\|terms\|accept-terms\|profile\|set-profile\|claim`, `source-publication`, `source-draft`, `draft`, `preview`, `publish`, `unpublish` |
 | `attachments` | `upload` (returns a ready file-cell value), `download-url` |
+| `api` | `get\|post\|put\|patch\|delete <path>` for public endpoints without a command (`--query`, `--body`/`--file`, `--header`); writes are gated like any other |
 | `login` · `logout` · `whoami` · `doctor` · `update --check` · `settings` | lifecycle |
 
 Global flags: `--app <id>` (or `ERPAI_APP_ID`, or a `.erpai/app` file), `--profile`, `--format json|table`, `--yes`, `--dry-run`.
@@ -56,7 +57,7 @@ Global flags: `--app <id>` (or `ERPAI_APP_ID`, or a `.erpai/app` file), `--profi
 
 - **Explicit target.** App-scoped commands need `--app`; there is no "last used app".
 - **Pre-flight.** If the key is restricted to certain apps, a different `--app` fails with exit `4` *before* any request.
-- **Destructive verbs ask.** `delete`, `bulk-delete`, `delete-by-filter`, `update-by-filter`, `tables delete`, `columns delete`, `workflows delete`, role changes, invitations, `catalog unpublish`, … require `--yes` or a typed confirmation. Filter-wide writes show the matching count first and refuse an empty filter unless `--all-rows --yes`.
+- **Destructive verbs ask.** `delete`, `bulk-delete`, `delete-by-filter`, `update-by-filter`, `tables delete`, `columns delete`, `workflows delete`, role changes, invitations, `catalog publish|unpublish|activate|install`, the permanent publisher steps, … require `--yes` or a typed confirmation. Filter-wide writes show the matching count first and refuse an empty filter unless `--all-rows --yes`.
 - **`--dry-run`** on every mutating command validates and prints the request plan without sending it.
 - **Only the public API.** The client can build paths under `/v1/` and `/open/v1/` only.
 
