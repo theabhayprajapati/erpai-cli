@@ -24,6 +24,7 @@ open = "5"
 url = "2"
 base16ct = { version = "0.2", features = ["alloc"] }
 mime_guess = "2"
+rpassword = "7"
 
 [dev-dependencies]
 wiremock = "0.6"

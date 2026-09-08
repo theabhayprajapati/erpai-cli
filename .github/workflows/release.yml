@@ -1,7 +1,7 @@
 name: Release
 on:
   push:
-    tags: ['v*']
+    tags: ['cli-v*']
 permissions:
   contents: write
 jobs:
@@ -39,14 +39,15 @@ jobs:
         with: { path: dist, merge-multiple: true }
       - name: Tag must match the built version
         run: |
-          ver="${GITHUB_REF_NAME#v}"; chmod +x dist/erpai-linux-x64
+          ver="${GITHUB_REF_NAME#cli-v}"; chmod +x dist/erpai-linux-x64
           [ "$(dist/erpai-linux-x64 --version)" = "erpai $ver" ] || { echo "binary version != tag"; exit 1; }
       - name: Checksums
         run: cd dist && sha256sum erpai-* > sha256.txt && cat sha256.txt
-      - name: Publish to erpai-cli-releases
+      - name: Publish the binaries to the public marketplace repo
         env:
           GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
         run: |
           [ -n "$GH_TOKEN" ] || { echo "RELEASES_TOKEN secret is not set — refusing to publish"; exit 1; }
-          printf '## What'"'"'s new\n\nSee the erpai-cli changelog for %s.\n' "${GITHUB_REF_NAME}" > notes.md
-          gh release create "${GITHUB_REF_NAME}" dist/* --repo erphq/erpai-cli-releases --title "erpai ${GITHUB_REF_NAME}" --notes-file notes.md
+          ver="${GITHUB_REF_NAME#cli-v}"
+          printf '## What'"'"'s new\n\nerpai CLI %s. The plugin pins a CLI version; see the plugin release notes.\n' "$ver" > notes.md
+          gh release create "${GITHUB_REF_NAME}" dist/* --repo erphq/agent-plugins --title "erpai CLI ${ver}" --notes-file notes.md

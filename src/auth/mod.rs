@@ -66,6 +66,9 @@ pub struct LoginArgs {
     /// Print the sign-in URL instead of opening a browser
     #[arg(long)]
     pub no_browser: bool,
+    /// Sign in through the browser instead of pasting a key
+    #[arg(long)]
+    pub browser: bool,
 }
 
 fn scopes_for(a: &LoginArgs) -> Result<Vec<String>> {
@@ -85,7 +88,7 @@ fn scopes_for(a: &LoginArgs) -> Result<Vec<String>> {
     };
     if let Some(bad) = list.iter().find(|s| ELEVATED.contains(&s.as_str())) {
         return Err(CliError::validation(format!("scope {bad} is elevated and cannot be minted by the CLI"))
-            .with_hint("an org admin can create such a key at https://apps.erp.ai/apps?settings=api-keys; then `erpai login --api-key`"));
+            .with_hint("an org admin can create such a key in the app (Settings → API Keys); then `erpai login --api-key`"));
     }
     if list.is_empty() {
         return Err(CliError::validation("no scopes"));
@@ -96,23 +99,27 @@ fn scopes_for(a: &LoginArgs) -> Result<Vec<String>> {
 pub async fn login(g: &Global, a: LoginArgs) -> Result<Rendered> {
     let store = ProfileStore::open()?;
     let existing = store.load(&g.profile)?;
-    let base = a
-        .base_url
-        .clone()
-        .or_else(|| existing.as_ref().map(|p| p.base_url.clone()))
-        .unwrap_or_else(|| DEFAULT_BASE_URL.to_string());
-    let base = base.trim_end_matches('/').to_string();
+    let base = resolve_base(&a, existing.as_ref())?;
     url::Url::parse(&base).map_err(|e| CliError::validation(format!("invalid --base-url: {e}")))?;
     // validate scopes early so a bad --scopes fails before any browser or network activity
     let scopes = scopes_for(&a)?;
 
     let mut profile = Profile::new(&g.profile, &base, "");
-    if let Some(k) = key_from_args(&a)? {
+    let pasted = match key_from_args(&a)? {
+        Some(k) => Some(k),
+        None if a.browser => None,
+        // The default flow: ask for a key the user created in the app.
+        None => Some(prompt_for_key(&base)?),
+    };
+    if let Some(k) = pasted {
         if k.is_empty() {
-            return Err(CliError::validation("empty API key"));
+            return Err(CliError::validation("empty API key")
+                .with_hint("create one at <base>/apps?settings=api-keys"));
         }
         profile.api_key = k;
         profile.key_name = Some("pasted".into());
+        // Prove the key before storing it, and fill in who it belongs to.
+        verify_and_enrich(&mut profile).await?;
     } else {
         if a.all_apps && !g.yes && !std::io::IsTerminal::is_terminal(&std::io::stdin()) {
             return Err(CliError::validation("--all-apps mints an org-wide key")
@@ -222,6 +229,110 @@ fn str_list(v: Option<&Value>) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Ask for the base URL (default `https://apps.erp.ai`) and the API key. The key is
+/// read without echo. Only used on a terminal; scripts pass `--api-key-stdin`.
+fn prompt_for_key(base: &str) -> Result<String> {
+    use std::io::IsTerminal;
+    if !std::io::stdin().is_terminal() {
+        return Err(
+            CliError::validation("no API key given and no terminal to ask on")
+                .with_hint("pipe it: `erpai login --api-key-stdin < key.txt`, or use --browser"),
+        );
+    }
+    eprintln!("Sign in to {base}");
+    eprintln!("Create a key at {base}/apps?settings=api-keys (Settings → API Keys → New API Key),");
+    eprintln!("then paste it below. It is stored in this machine's erpai profile only.");
+    let key = rpassword::prompt_password("API key: ")
+        .map_err(|e| CliError::internal(format!("could not read the key: {e}")))?;
+    Ok(key.trim().to_string())
+}
+
+/// Read the base URL from `--base-url`, else the profile's, else ask (terminal only),
+/// else the default.
+fn resolve_base(a: &LoginArgs, existing: Option<&Profile>) -> Result<String> {
+    use std::io::IsTerminal;
+    if let Some(b) = &a.base_url {
+        return Ok(b.trim().trim_end_matches('/').to_string());
+    }
+    let current = existing
+        .map(|p| p.base_url.clone())
+        .unwrap_or_else(|| DEFAULT_BASE_URL.to_string());
+    // A stored profile keeps its URL; a fresh interactive login may point elsewhere.
+    if existing.is_some()
+        || a.api_key.is_some()
+        || a.api_key_stdin
+        || !std::io::stdin().is_terminal()
+    {
+        return Ok(current.trim_end_matches('/').to_string());
+    }
+    eprint!("Platform URL [{current}]: ");
+    use std::io::Write;
+    let _ = std::io::stderr().flush();
+    let mut line = String::new();
+    std::io::stdin()
+        .read_line(&mut line)
+        .map_err(|e| CliError::internal(format!("could not read the URL: {e}")))?;
+    let line = line.trim();
+    Ok(if line.is_empty() {
+        current.trim_end_matches('/').to_string()
+    } else {
+        line.trim_end_matches('/').to_string()
+    })
+}
+
+/// Prove a pasted key works and record whose it is. `whoami` carries the full identity;
+/// older servers do not have it, so fall back to a cheap authenticated read.
+async fn verify_and_enrich(p: &mut Profile) -> Result<()> {
+    let api = ApiClient::new(p)?;
+    match api.get("/v1/app-builder/whoami", &[]).await {
+        Ok(v) => {
+            let body = v.get("data").cloned().unwrap_or(v);
+            if let Some(s) = body.get("userId").and_then(Value::as_str) {
+                p.user_id = Some(s.into());
+            }
+            if let Some(s) = body.get("email").and_then(Value::as_str) {
+                p.email = Some(s.into());
+            }
+            if let Some(s) = body.get("tenantId").and_then(Value::as_str) {
+                p.org_id = Some(s.into());
+            }
+            if let Some(s) = body.get("orgName").and_then(Value::as_str) {
+                p.org_name = Some(s.into());
+            }
+            if let Some(k) = body.get("apiKey") {
+                if let Some(s) = k.get("id").and_then(Value::as_str) {
+                    p.key_id = Some(s.into());
+                }
+                if let Some(s) = k.get("name").and_then(Value::as_str) {
+                    p.key_name = Some(s.into());
+                }
+                if k.get("scopes").is_some() {
+                    p.scopes = str_list(k.get("scopes"));
+                }
+                if k.get("allowedApps").is_some() {
+                    p.allowed_apps = str_list(k.get("allowedApps"));
+                }
+            }
+            Ok(())
+        }
+        Err(e) if e.code == ErrorCode::NotFound => {
+            let v = api.get("/v1/app-builder/app", &[("pageSize", "1")]).await?;
+            // the app list is the only identity an older server gives a key
+            if p.org_id.is_none() {
+                if let Some(t) = v
+                    .pointer("/data/0/tenantId")
+                    .and_then(Value::as_str)
+                    .or_else(|| v.pointer("/data/0/orgId").and_then(Value::as_str))
+                {
+                    p.org_id = Some(t.into());
+                }
+            }
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
+}
+
 fn key_from_args(a: &LoginArgs) -> Result<Option<String>> {
     if let Some(k) = &a.api_key {
         return Ok(Some(k.trim().to_string()));
@@ -277,7 +388,11 @@ pub async fn logout(g: &Global) -> Result<Rendered> {
     store.delete(&g.profile)?;
     let mut out = json!({ "revoked": revoked, "forgotten": true, "profile": g.profile });
     if !revoked {
-        out["hint"] = "the key is still active server-side — revoke it at https://apps.erp.ai/apps?settings=api-keys".into();
+        out["hint"] = format!(
+            "the key is still active server-side — revoke it at {}/apps?settings=api-keys",
+            p.base_url.trim_end_matches('/')
+        )
+        .into();
         out["detail"] = detail;
     }
     Ok(Output::item(out))

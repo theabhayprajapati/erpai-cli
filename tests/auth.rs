@@ -86,6 +86,7 @@ async fn browser_login_exchanges_code_and_mints_scoped_key() {
         .env("ERPAI_CONFIG_HOME", d.path())
         .args([
             "login",
+            "--browser",
             "--base-url",
             &s.uri(),
             "--no-browser",
@@ -190,4 +191,67 @@ fn elevated_scopes_are_refused() {
         .as_str()
         .unwrap()
         .contains("admin:*"));
+}
+
+#[tokio::test]
+async fn pasted_key_is_verified_and_enriched_before_it_is_stored() {
+    let s = server().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/app-builder/whoami"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "data": {
+                "userId": "u9", "email": "qa@example.com", "tenantId": "org-9", "orgName": "QA Org",
+                "apiKey": {"id":"k9","name":"Laptop","scopes":["records:read"],"allowedApps":["a1"]}
+            }
+        })))
+        .expect(1)
+        .mount(&s)
+        .await;
+    let d = tempfile::tempdir().unwrap();
+    let out = std::process::Command::new(assert_cmd::cargo::cargo_bin("erpai"))
+        .env("ERPAI_CONFIG_HOME", d.path())
+        .args([
+            "login",
+            "--base-url",
+            &s.uri(),
+            "--api-key",
+            "erp_pat_live_abc",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(v["data"]["org"]["name"], "QA Org");
+    assert_eq!(v["data"]["user"]["email"], "qa@example.com");
+    assert_eq!(v["data"]["apiKey"]["name"], "Laptop");
+    let p: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(d.path().join("profiles/default.json")).unwrap())
+            .unwrap();
+    assert_eq!(p["org_id"], "org-9");
+    assert_eq!(p["api_key"], "erp_pat_live_abc");
+}
+
+#[tokio::test]
+async fn a_rejected_key_is_never_stored() {
+    let s = server().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/app-builder/whoami"))
+        .respond_with(
+            ResponseTemplate::new(401)
+                .set_body_json(serde_json::json!({"message":"Invalid or expired token"})),
+        )
+        .mount(&s)
+        .await;
+    let d = tempfile::tempdir().unwrap();
+    let out = std::process::Command::new(assert_cmd::cargo::cargo_bin("erpai"))
+        .env("ERPAI_CONFIG_HOME", d.path())
+        .args(["login", "--base-url", &s.uri(), "--api-key", "nope"])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(3));
+    assert!(!d.path().join("profiles/default.json").exists());
 }

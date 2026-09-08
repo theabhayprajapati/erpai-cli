@@ -3,7 +3,10 @@ use crate::error::{CliError, Result};
 use crate::output::{Output, Rendered};
 use serde_json::{json, Value};
 
-const RELEASES_REPO: &str = "erphq/erpai-cli-releases";
+/// The marketplace repo carries both the plugin tree and the CLI binaries; CLI
+/// releases are tagged `cli-v<version>` (plugin releases use `plugin-v*`).
+const RELEASES_REPO: &str = "erphq/agent-plugins";
+const CLI_TAG_PREFIX: &str = "cli-v";
 
 #[derive(clap::Args, Debug)]
 pub struct UpdateArgs {
@@ -32,8 +35,10 @@ fn newer(latest: &str, current: &str) -> bool {
 
 pub async fn run(_g: &Global, _a: UpdateArgs) -> Result<Rendered> {
     let api = std::env::var("ERPAI_UPDATE_API").unwrap_or_else(|_| "https://api.github.com".into());
+    // `releases/latest` would answer with whichever tag is newest, plugin or CLI —
+    // list instead and keep only the CLI ones.
     let url = format!(
-        "{}/repos/{RELEASES_REPO}/releases/latest",
+        "{}/repos/{RELEASES_REPO}/releases?per_page=30",
         api.trim_end_matches('/')
     );
     let http = reqwest::Client::builder()
@@ -52,15 +57,40 @@ pub async fn run(_g: &Global, _a: UpdateArgs) -> Result<Rendered> {
             resp.status().as_u16()
         )));
     }
-    let v: Value = resp
+    let body: Value = resp
         .json()
         .await
         .map_err(|e| CliError::network(e.to_string()))?;
+    let releases: Vec<Value> = match &body {
+        Value::Array(a) => a.clone(),
+        other => vec![other.clone()],
+    };
+    let v = releases
+        .into_iter()
+        .filter(|r| {
+            r.get("tag_name")
+                .and_then(Value::as_str)
+                .map(|t| t.starts_with(CLI_TAG_PREFIX))
+                .unwrap_or(false)
+                && r.get("draft") != Some(&Value::Bool(true))
+        })
+        .max_by_key(|r| {
+            let t = r
+                .get("tag_name")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .trim_start_matches(CLI_TAG_PREFIX)
+                .to_string();
+            t.split('.')
+                .filter_map(|x| x.parse::<u64>().ok())
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or(Value::Null);
     let latest = v
         .get("tag_name")
         .and_then(Value::as_str)
         .unwrap_or("")
-        .trim_start_matches('v')
+        .trim_start_matches(CLI_TAG_PREFIX)
         .to_string();
     let current = env!("CARGO_PKG_VERSION");
     let available = !latest.is_empty() && newer(&latest, current);
@@ -70,7 +100,7 @@ pub async fn run(_g: &Global, _a: UpdateArgs) -> Result<Rendered> {
     } else if managed {
         "this binary is managed by the ERP AI agent plugin and pinned to a version — update the plugin (run the `erpai:update` skill) to move to the new CLI".to_string()
     } else {
-        format!("a newer version is available — reinstall from https://github.com/{RELEASES_REPO}/releases/latest")
+        format!("a newer version is available — reinstall from https://github.com/{RELEASES_REPO}/releases/tag/{CLI_TAG_PREFIX}{latest}")
     };
     Ok(Output::item(json!({
         "current": current,
