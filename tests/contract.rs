@@ -45,3 +45,16 @@ fn missing_profile_is_auth_error_3() {
     assert_eq!(v["error"]["code"], "auth_error");
     assert!(v["error"]["hint"].as_str().unwrap().contains("erpai login"));
 }
+
+#[test]
+fn settings_works_without_a_profile() {
+    let dir = tempfile::tempdir().unwrap();
+    let a = erpai()
+        .env("ERPAI_CONFIG_HOME", dir.path())
+        .arg("settings")
+        .assert()
+        .success();
+    let v: serde_json::Value = serde_json::from_slice(&a.get_output().stdout).unwrap();
+    assert_eq!(v["data"]["activeProfile"], "default");
+    assert!(v["data"]["active"].is_null());
+}
