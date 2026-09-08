@@ -96,3 +96,107 @@ fn every_leaf_command_documents_output_shape() {
         }
     }
 }
+
+#[test]
+fn every_leaf_command_in_every_group_documents_output_shape() {
+    let groups: &[(&[&str], &[&str])] = &[
+        (
+            &["workflows"],
+            &[
+                "list",
+                "get",
+                "create",
+                "update",
+                "patch-node",
+                "rename",
+                "delete",
+                "activate",
+                "deactivate",
+                "execute",
+                "test-node",
+                "executions",
+                "execution",
+                "execution-stop",
+                "execution-retry",
+                "run-summary",
+                "run-node",
+            ],
+        ),
+        (&["workflows", "nodes"], &["list", "schema", "options"]),
+        (
+            &["workflows", "credentials"],
+            &["list", "get", "create", "update", "delete", "test", "types"],
+        ),
+        (&["layouts"], &["list", "get", "create", "update", "delete"]),
+        (
+            &["forms"],
+            &["get", "list", "set", "update", "patch", "delete"],
+        ),
+        (
+            &["documents"],
+            &["list", "get", "create", "update", "delete", "duplicate"],
+        ),
+        (
+            &["documents", "folders"],
+            &["list", "create", "update", "delete"],
+        ),
+        (
+            &["roles"],
+            &[
+                "list",
+                "create",
+                "update",
+                "delete",
+                "users",
+                "assign",
+                "remove",
+                "invite",
+                "invites",
+                "invite-cancel",
+            ],
+        ),
+        (
+            &["pages"],
+            &[
+                "list",
+                "get",
+                "hydrated",
+                "home",
+                "create",
+                "create-home",
+                "update",
+                "delete",
+                "reorder",
+            ],
+        ),
+        (&["widgets"], &["get", "list", "set", "update", "delete"]),
+        (
+            &["catalog"],
+            &[
+                "get",
+                "source-app",
+                "draft",
+                "preview",
+                "publish",
+                "unpublish",
+                "install",
+            ],
+        ),
+        (&["attachments"], &["upload", "download-url"]),
+        (&["tables", "actions"], &["list", "create", "delete"]),
+    ];
+    for (prefix, cmds) in groups {
+        for c in *cmds {
+            let mut args: Vec<&str> = prefix.to_vec();
+            args.push(c);
+            args.push("--help");
+            let out = erpai().args(&args).assert().success();
+            let text = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+            assert!(
+                text.contains("Output:"),
+                "{} --help lacks an Output: line",
+                args.join(" ")
+            );
+        }
+    }
+}
