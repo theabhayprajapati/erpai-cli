@@ -72,6 +72,8 @@ pub enum Command {
     Whoami,
     /// Check the runtime: profile, base URL, connectivity, key validity. Exit code is that of the first failing check.
     Doctor,
+    /// Check whether a newer CLI release exists (never changes anything itself)
+    Update(crate::cmd::update::UpdateArgs),
     /// Show effective settings (profiles, paths)
     Settings,
 }

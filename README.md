@@ -1,42 +1,71 @@
-# erpai-cli
+# erpai — the ERP•AI command-line client
 
-> Natural-language CLI for ERP data. Invoices · payroll · inventory · 30+ business objects. Ask in English, get streamed answers.
-
-`erpai` is the command-line client for the [ERP•AI](https://erp.ai) platform. Point it at your tenant, ask a question in plain English, and it translates, runs, and streams the answer back — no query language, no dashboards.
-
-```sh
-erpai chat "what's our AR aging over 60 days by customer?"
-erpai chat "show last month's payroll run totals by department"
-erpai chat "which POs are still open against vendor Acme?"
-```
+`erpai` is how coding agents (and people) work with [ERP•AI](https://apps.erp.ai) from a terminal: apps, tables, columns, records, SQL, workflows, views, forms, documents, roles, pages, widgets, the public catalog, and attachments — over the platform's public API, with one output contract and a safety model designed for agents.
 
 ## Install
 
-Signed binaries (macOS · Linux · Windows) ship from [`erphq/erpai-cli-releases`](https://github.com/erphq/erpai-cli-releases) via GitHub Releases. Install the latest:
+**With the ERP•AI agent plugin (recommended)** — the plugin pins and bundles the CLI:
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/erphq/erpai-cli-releases/main/public/install.sh | sh
+```
+/plugin marketplace add erphq/agent-plugins
+/plugin install erpai@erpai-plugins
 ```
 
-The installer platform-detects and drops the `erpai` binary on your `PATH`. See the [download page](https://github.com/erphq/erpai-cli-releases) for manual downloads and checksums.
+**Standalone** — download a release binary for your platform from
+[`erphq/erpai-cli-releases`](https://github.com/erphq/erpai-cli-releases/releases/latest), verify it against `sha256.txt`, and put it on your `PATH`.
 
-## Getting started
+## Sign in
 
-1. **Install** — run the command above.
-2. **Log in** — `erpai login` (authenticates against your ERP•AI account).
-3. **Ask** — `erpai chat "<your question>"`, or drop into the interactive REPL with `erpai chat`.
+```
+erpai login                 # opens the browser once; you pick the org and the apps this key may touch
+erpai login --api-key …     # store an existing key instead
+erpai whoami                # who you are, which org, which apps the key can reach
+erpai doctor                # profile, base URL, credential — exit code is the first failing check
+```
 
-## Requirements
+`erpai login` mints an API key that is **restricted to the apps you chose** and to least-privilege scopes; `--read-only` narrows it further, `--all-apps` widens it (and asks). Credentials live in `~/.config/erpai/profiles/<profile>.json` (mode 0600). One profile = one environment: `--profile` selects it; the base URL is set at login and never by a per-command flag.
 
-- An [ERP•AI](https://erp.ai) account
-- macOS (Apple Silicon / Intel), Linux (x64), or Windows (x64)
+## Contract
 
-## Status
+- **stdout is JSON, always.** `{"data": …}` for one item; `{"data": [...], "page": {"no","size","total"}}` for lists. Writes add `"context": {"profile","org","app"}` so the transcript shows where the write went.
+- **stderr is JSON, only on failure.** `{"error": {"code","message","hint"?,"requestId"?}}`.
+- **Exit codes are categorical.** `0` ok · `1` internal · `2` validation · `3` auth · `4` forbidden · `5` network · `6` API error · `7` not found.
+- `erpai <group> <command> --help` documents each command's output shape and errors. Read it instead of memorising flags.
 
-This repo is the public home for the CLI. Binaries are distributed through [`erpai-cli-releases`](https://github.com/erphq/erpai-cli-releases); release source is tracked there. Issues and feature requests are welcome here.
+## Commands
 
-## Links
+| Group | Commands |
+|---|---|
+| `apps` | `list`, `get` |
+| `tables` | `list`, `get`, `create`, `update`, `delete`, `actions list\|create\|delete` |
+| `columns` | `list`, `add` (object or array), `update`, `delete` |
+| `records` | `query`, `count`, `aggregate`, `get`, `get-many`, `create`, `bulk-create`, `update`, `bulk-update`, `delete`, `bulk-delete`, `update-by-filter`, `delete-by-filter` |
+| `sql` | `schema`, `run`, `generate` |
+| `workflows` | `list`, `get`, `create`, `update`, `patch-node`, `rename`, `delete`, `activate`, `deactivate`, `execute`, `test-node`, `executions`, `execution`, `execution-stop`, `execution-retry`, `run-summary`, `run-node`, `nodes list\|schema\|options`, `credentials …` |
+| `layouts` · `forms` | saved views · entry forms |
+| `documents` | documents and folders |
+| `roles` | roles, users, assign/remove, invitations |
+| `pages` · `widgets` | custom pages, home config, table insight widgets |
+| `catalog` | draft, preview, publish, unpublish, install |
+| `attachments` | `upload` (returns a ready file-cell value), `download-url` |
+| `login` · `logout` · `whoami` · `doctor` · `update --check` · `settings` | lifecycle |
 
-- [ERP•AI platform](https://erp.ai)
-- [Releases + install](https://github.com/erphq/erpai-cli-releases)
-- [Architecture map](https://github.com/erphq/MetaRepo) (org members)
+Global flags: `--app <id>` (or `ERPAI_APP_ID`, or a `.erpai/app` file), `--profile`, `--format json|table`, `--yes`, `--dry-run`.
+
+## Safety model
+
+- **Explicit target.** App-scoped commands need `--app`; there is no "last used app".
+- **Pre-flight.** If the key is restricted to certain apps, a different `--app` fails with exit `4` *before* any request.
+- **Destructive verbs ask.** `delete`, `bulk-delete`, `delete-by-filter`, `update-by-filter`, `tables delete`, `columns delete`, `workflows delete`, role changes, invitations, `catalog unpublish`, … require `--yes` or a typed confirmation. Filter-wide writes show the matching count first and refuse an empty filter unless `--all-rows --yes`.
+- **`--dry-run`** on every mutating command validates and prints the request plan without sending it.
+- **Only the public API.** The client can build paths under `/v1/` and `/open/v1/` only.
+
+## Building from source
+
+```
+git clone https://github.com/erphq/erpai-cli && cd erpai-cli
+cargo build --release          # target/release/erpai
+cargo test                     # unit, contract, and safety suites (mock server; no network)
+```
+
+Requires Rust 1.85+. Releases are built by CI for macOS (arm64, x64), Linux (x64, arm64), and Windows (x64) and published to `erphq/erpai-cli-releases` with `sha256.txt`.

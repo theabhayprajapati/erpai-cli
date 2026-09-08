@@ -11,6 +11,7 @@ pub mod roles;
 pub mod settings;
 pub mod sql;
 pub mod tables;
+pub mod update;
 pub mod widgets;
 pub mod workflows;
 

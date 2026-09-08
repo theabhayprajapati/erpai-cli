@@ -55,6 +55,7 @@ async fn run(cli: Cli) -> erpai::error::Result<output::Rendered> {
         Command::Logout => auth::logout(&g).await,
         Command::Whoami => auth::whoami(&g).await,
         Command::Doctor => auth::doctor(&g).await,
+        Command::Update(a) => cmd::update::run(&g, a).await,
         Command::Settings => cmd::settings::run(&g),
     }
 }
